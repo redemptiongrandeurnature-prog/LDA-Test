@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Langue des Âmes</title>
+<style>
+:root{
+--bg:#0b0f17; --ink:#e5e7eb; --gold:#f5c84b; --accent:#7dd3fc;
+--ok:#22c55e; --bad:#ef4444; --slate:#1f2937; --panel:#0f172a;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',sans-serif;background:var(--bg);color:var(--ink)}
+.wrap{max-width:1200px;margin:auto;padding:24px}
+header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(245,200,75,.25);padding-bottom:12px;margin-bottom:16px}
+.title{color:var(--gold);font-size:28px;letter-spacing:.3px}
+.score{display:flex;gap:10px;align-items:center;background:rgba(245,200,75,.08);border:1px solid rgba(245,200,75,.35);padding:8px 12px;border-radius:12px}
+nav{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+nav button{background:#0b1220;color:var(--ink);border:1px solid #334155;padding:10px 14px;border-radius:10px;cursor:pointer}
+nav button:hover{border-color:var(--accent)}
+.panel{border:1px solid rgba(125,211,252,.25);border-radius:16px;padding:16px;background:rgba(125,211,252,.06);min-height:280px}
+.big{text-align:center;font-size:30px;margin:10px 0;color:#e2e8f0}
+.choice{border:1px solid #334155;border-radius:12px;padding:10px;text-align:center;background:#0b1220;cursor:pointer;margin:6px 0;transition:0.3s}
+.choice.correct{border-color:var(--ok)}
+.choice.wrong{border-color:var(--bad)}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sectionTitle{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0 12px}
+.sectionTitle .tag{font-size:12px;color:#0ea5e9;background:#07263a;border:1px solid #0ea5e980;padding:4px 8px;border-radius:999px}
+.sectionTitle .head{font-weight:800;font-size:22px;letter-spacing:.4px;background:linear-gradient(90deg,var(--gold),#fff);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 0 rgba(0,0,0,0)}
+.maze{display:grid;grid-template-columns:repeat(8,52px);gap:6px;margin:16px auto}
+.cell{width:52px;height:52px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #374151;background:#0f172a;position:relative}
+.cell.goal{border-color:var(--gold)}
+.cell.me{outline:2px solid var(--accent)}
+.cell.wall{background:#1e293b}
+.cell.enemy{background:#ef4444}
+.constellation{display:flex;flex-wrap:wrap;gap:30px;justify-content:center;margin-top:8px}
+.node{width:80px;height:80px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;position:relative}
+.node.locked{border-color:#555;opacity:.5}
+.overlay{position:relative}
+.quiz{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.quiz .card{background:#0b1220;border:1px solid #334155;border-radius:14px;padding:16px;min-width:320px;max-width:520px}
+.quiz .q-title{font-weight:700;color:var(--gold);text-align:center;margin-bottom:6px}
+.quiz .q-word{font-size:22px;text-align:center;margin:8px 0 12px}
+.flex-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#sideCanvas{width:100%;max-width:980px;height:420px;border:1px solid #334155;border-radius:12px;background:#0a1220;margin:0 auto;display:block}
+.maze-root { display: grid; place-items: center; margin-top: 16px; }
+.maze-container { display: grid; grid-template-areas:
+  ".    up    ."
+  "left grid right"
+  ".   down   .";
+  gap: 12px; justify-items: center; align-items: center;
+}
+.maze-container .maze { grid-area: grid; }
+.ctrl.up { grid-area: up; max-width:200px; }
+.ctrl.down { grid-area: down; max-width:200px; }
+.ctrl.left { grid-area: left; max-width:120px; }
+.ctrl.right { grid-area: right; max-width:120px; }
+.ctrl h4 { margin:0 0 6px 0; font-size:14px; color:var(--gold); text-align:center; }
+#sideCanvas { background:#0a1220; }
+
+.choice {
+  padding: 8px 12px;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  background: #1f2937; /* gris foncé */
+  color: white;
+  transition: 0.3s;
+}
+.choice:hover {
+  background: #374151; /* gris un peu plus clair */
+}
+.choice.selected {
+  background: #2563eb; /* bleu */
+  border-color: #2563eb;
+}
+.choice.correct {
+  background: #16a34a; /* vert */
+  border-color: #16a34a;
+  color: white;
+}
+.choice.wrong {
+  background: #dc2626; /* rouge */
+  border-color: #dc2626;
+  color: white;
+}
+
+.choice.matched {
+  background: transparent !important;
+  border: none !important;
+  cursor: default !important;
+}
+
+
+
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="title">Langue des Âmes - JéVaWEx </div>
+<div class="score">Score : <b id="score">0</b> · Streak ×<b id="streak">1</b></div>
+<div class="mode-select">
+  <label>
+    Mode :
+    <select id="modeSelect">
+      <option value="LDA">LDA</option>
+      <option value="Incantations">Incantations</option>
+    </select>
+  </label>
+</div>
+
+
+
+
+</header>
+<nav>
+<button onclick="switchView('assoc')">Association</button>
+<button onclick="switchView('cats')">Catégories</button>
+<button onclick="switchView('maze')">Labyrinthe</button>
+<button onclick="switchView('side')">Sidescroller</button>
+<button onclick="switchView('progress')">Paires</button>
+<button onclick="switchView('memory')">Mémoire</button>
+
+</nav>
+<div class="panel" id="view-assoc"></div>
+<div class="panel" id="view-cats" hidden></div>
+<div class="panel" id="view-maze" hidden></div>
+<div class="panel" id="view-side" hidden>
+  <canvas id="sideCanvas" width="980" height="420"></canvas>
+</div>
+
+<div class="panel" id="view-progress" hidden>
+<div class="sectionTitle"><span class="tag">Progression</span><span class="head">Paires</span></div>
+<div class="constellation" id="constellation"></div>
+</div>
+<div id="view-memory" hidden>
+  <span class="head">Mémoire</span>
+  <div id="memory-board" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap:10px; max-width:600px; margin:auto;"></div>
+</div>
+
+</div>
+
+<script>
+/* ---------------- Core state ---------------- */
+let score=0, streak=1;
+function updateScore(good){
+  if(good){ score += 10*streak; streak++; } 
+  else { streak=1; score=Math.max(0, score-5); }
+  document.getElementById('score').textContent = score;
+  document.getElementById('streak').textContent = streak;
+}
+
+let currentMode = "LDA";
+document.getElementById("modeSelect").addEventListener("change", (e) => {
+  currentMode = e.target.value;
+});
+
+
+
+/* ---------------- Utils ---------------- */
+function pickOne(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function shuffled(arr){ return [...arr].sort(()=>Math.random()-0.5); }
+function createChoice(text, correct, callback){
+    const b=document.createElement('div'); 
+    b.className='choice'; 
+    b.textContent=text;
+    b.onclick=()=>{ b.classList.add(correct?'correct':'wrong'); callback(correct); };
+    return b;
+}
+
+/* ---------------- Words dataset ---------------- */
+const wordsLDA = [
+
+    {lda:"PéHEs", fr:"vous", cat:"# Individu", type:"Aspect Physique"},
+{lda:"TaKEn", fr:"secondes", cat:"TEMPS", type:"Abstrait"},
+{lda:"PaREj", fr:"joie", cat:"# Propriétés d'un individu", type:""},
+{lda:"MaVEn", fr:"très lentement", cat:"# Espace", type:"Abstrait / Conceptuel"},
+{lda:"PaREk", fr:"peur", cat:"# Propriétés d'un individu", type:""},
+{lda:"VaJEy", fr:"donner / infliger / imposer", cat:"# Action", type:"Abstraite"},
+{lda:"VéMEy", fr:"arriver / mettre dans un nouveau lieu", cat:"# Action concrète", type:"Physique"},
+{lda:"VaVEr", fr:"supporter / soigner", cat:"# Action", type:"Abstraite"},
+{lda:"KaHEd", fr:"deux (2)", cat:"# Quantités et mesures", type:"Abstrait / Approximatives"},
+{lda:"RéV", fr:"état d'animation physique / 'vitalité'", cat:"# État physique", type:""},
+{lda:"PéVEo", fr:"personne morte (cadavre)", cat:"# Individu", type:"Aspect Physique"},
+{lda:"TaKEd", fr:"minutes", cat:"TEMPS", type:"Abstrait"},
+{lda:"RéVEy", fr:"animé / 'vivant'", cat:"# État physique", type:""},
+{lda:"MaVEo", fr:"immobile", cat:"# Espace", type:"Abstrait / Conceptuel"},
+{lda:"JéXEn", fr:"objet très dangereux (arme puissante / de siège, baliste, catapulte, etc.)", cat:"# Objet", type:"Concret"},
+{lda:"RéX", fr:"danger pour le physique", cat:"# État physique", type:""},
+{lda:"VéMEn", fr:"partir / quitter", cat:"# Action concrète", type:"Physique"},
+{lda:"JéXEd", fr:"objet dangereux (arme, épée, hache, marteau, etc.)", cat:"# Objet", type:"Concret"},
+{lda:"KaHEk", fr:"quatre (4)", cat:"# Quantités et mesures", type:"Abstrait / Approximatives"},
+{lda:"VaZEo", fr:"action magique", cat:"# Action", type:"Abstraite"},
+{lda:"KaHEj", fr:"trois (3)", cat:"# Quantités et mesures", type:"Abstrait / Approximatives"},
+{lda:"KaHEy", fr:"huit (8)", cat:"# Quantités et mesures", type:"Abstrait / Approximatives"},
+{lda:"PéKEy", fr:"tout le monde", cat:"# Individu", type:"Aspect Physique"},
+{lda:"VaVEx", fr:"ramener à la vie", cat:"# Action", type:"Abstraite"},
+{lda:"ZaKEy", fr:"tout (entier)", cat:"# Structures, mathématiques et logique", type:"Abstrait"}
+];
+
+const wordsIncantations = [
+  { lda:"PéHEs TaKEn PaREj", fr:"Apaisement — calme, aucune action offensive." },
+  { lda:"PéHEs TaKEn MaVEn", fr:"Enchevêtrement — immobilise jusqu’à dégâts." },
+  { lda:"PéHEs TaKEn PaREk", fr:"Frayeur — la cible doit fuir." },
+  { lda:"PéHEs VaJEy VéMEy", fr:"Rafale — propulse la cible." },
+  { lda:"PéHEs VaVEr KaHEd RéV", fr:"Soins magiques — soigne 2 PV." },
+  { lda:"PéVEo TaKEd RéVEy", fr:"Animation des morts — invoque un mort-vivant (5 PV, 1 dégât)." },
+  { lda:"PéHEs VaJEy MaVEo", fr:"Immobilisation — paralysie jusqu’à blessure." },
+  { lda:"JéXEn KaHEd VaJEy RéX", fr:"Impact magique — arme inflige 2 dégâts." },
+  { lda:"PéHEs VaJEy VéMEn", fr:"Bourrasque — renverse la cible." },
+  { lda:"JéXEd KaHEk VaJEy RéX", fr:"Lame enflammée — arme inflige 4 dégâts de feu." },
+  { lda:"VaZEo KaHEj PéHEs VaVEr KaHEj RéV", fr:"Prière de soins — soigne 3×3 PV." },
+  { lda:"JéXEn VaJEy KaHEy RéX", fr:"Boule de feu — arme de jet inflige 8 dégâts de feu." },
+  { lda:"VaZEo PéKEy VaJEy VéMEy VaJEy VéMEn", fr:"Onde de choc — propulsion + renversement pour tous." },
+  { lda:"VaVEx ZaKEy RéV", fr:"Rappel à la vie — ramène un mort avec ses PV." },
+  { lda:"PéKEy TaKEn VaJEy VéMEn", fr:"Tremblement de terre — renverse et bloque la relève." }
+];
+
+function getWords() {
+  return currentMode === "LDA" ? wordsLDA : wordsIncantations;
+}
+
+
+/* ---------------- Views ---------------- */
+let mazeTimer=null, sideState=null;
+
+/* ---------------- Association ---------------- */
+function assocGame(){
+    const wrap = document.getElementById('view-assoc'); wrap.innerHTML='';
+    wrap.insertAdjacentHTML('afterbegin', `<div class="sectionTitle"><span class="tag">Mode</span><span class="head">Association</span></div>`);
+    const w = pickOne(getWords());
+    const q = document.createElement('div'); q.textContent=w.lda; q.className='big';
+    wrap.appendChild(q);
+    const grid = document.createElement('div'); grid.className='grid4';
+    let opts=[w.fr];
+    while(opts.length<4){ const r=pickOne(getWords()).fr; if(!opts.includes(r)) opts.push(r); }
+    opts = shuffled(opts);
+    opts.forEach(o=>{
+        grid.appendChild(createChoice(o, o===w.fr, ok=>{ updateScore(ok); setTimeout(assocGame,700); }));
+    });
+    wrap.appendChild(grid);
+}
+
+/* ---------------- Categories ---------------- */
+function catGame(){
+    const wrap = document.getElementById('view-cats'); wrap.innerHTML='';
+    wrap.insertAdjacentHTML('afterbegin', `<div class="sectionTitle"><span class="tag">Mode</span><span class="head">Catégories</span></div>`);
+    const w = pickOne(getWords());
+    const q = document.createElement('div'); q.textContent=w.lda; q.className='big';
+    wrap.appendChild(q);
+    const cats = [...new Set(getWords().map(x=>x.cat))];
+    const grid = document.createElement('div');
+    grid.style.display='grid'; grid.style.gridTemplateColumns='repeat(auto-fit,minmax(160px,1fr))'; grid.style.gap='10px';
+    cats.forEach(c=>{
+        grid.appendChild(createChoice(c, c===w.cat, ok=>{ updateScore(ok); setTimeout(catGame,700); }));
+    });
+    wrap.appendChild(grid);
+}
+
+/* ---------------- Paires (jeu d'association) ---------------- */
+function drawConstellation(){
+  const c = document.getElementById('constellation'); 
+  if(!c) return;
+  c.innerHTML='';
+
+  const nWords = 6; // nombre de paires affichées en même temps
+
+  // On choisit n mots uniques, puis on met leurs LDA à gauche et leurs FR à droite (mélangés)
+  const basePairs = shuffled(getWords()).slice(0, nWords);
+
+
+  // Colonnes
+  const leftCol = document.createElement('div');
+  leftCol.style.display = 'flex';
+  leftCol.style.flexDirection = 'column';
+  leftCol.style.gap = '10px';
+
+  const rightCol = document.createElement('div');
+  rightCol.style.display = 'flex';
+  rightCol.style.flexDirection = 'column';
+  rightCol.style.gap = '10px';
+
+  let selectedLDA = null;
+  let selectedFR = null;
+  let lock = false; // empêche les clics pendant l'animation 1s
+
+  // Helpers
+  const attachLeftHandler = (btn) => {
+    btn.onclick = () => {
+      if(lock) return;
+      if(selectedLDA) selectedLDA.classList.remove('selected');
+      selectedLDA = btn;
+      btn.classList.add('selected');
+      checkMatch();
+    };
+  };
+  const attachRightHandler = (btn) => {
+    btn.onclick = () => {
+      if(lock) return;
+      if(selectedFR) selectedFR.classList.remove('selected');
+      selectedFR = btn;
+      btn.classList.add('selected');
+      checkMatch();
+    };
+  };
+
+  // Boutons à gauche (LDA)
+  basePairs.forEach(w=>{
+    const b = document.createElement('div');
+    b.className = 'choice';
+    b.textContent = w.lda;
+    b.dataset.match = w.fr; // clé de correspondance
+    attachLeftHandler(b);
+    leftCol.appendChild(b);
+  });
+
+  // Boutons à droite (FR) — mêmes paires mais mélangées
+  shuffled(basePairs).forEach(w=>{
+    const b = document.createElement('div');
+    b.className = 'choice';
+    b.textContent = w.fr;
+    b.dataset.match = w.fr;
+    attachRightHandler(b);
+    rightCol.appendChild(b);
+  });
+
+  // Conteneur
+  const container = document.createElement('div');
+  container.style.display = 'flex';
+  container.style.justifyContent = 'center';
+  container.style.gap = '40px';
+  container.appendChild(leftCol);
+  container.appendChild(rightCol);
+  c.appendChild(container);
+
+  // Set des FR présents (avec option d'exclure la paire sélectionnée)
+  function currentFrSet(excludeFr=null){
+    const set = new Set();
+    leftCol.querySelectorAll('.choice').forEach(el=>{
+      if(excludeFr && el.dataset.match===excludeFr) return;
+      set.add(el.dataset.match);
+    });
+    rightCol.querySelectorAll('.choice').forEach(el=>{
+      if(excludeFr && el.dataset.match===excludeFr) return;
+      set.add(el.dataset.match);
+    });
+    return set;
+  }
+
+  // Choisit un nouveau mot qui n'est pas déjà sur le plateau (si possible)
+function pickNewWord(excludeFr){
+  const used = currentFrSet(excludeFr);
+  const pool = getWords();
+  const candidates = pool.filter(w=>!used.has(w.fr));
+  return pickOne(candidates.length ? candidates : pool);
+}
+
+
+
+  // Remplace uniquement les deux boutons sélectionnés par une nouvelle paire
+  function replacePair(leftBtn, rightBtn, frToReplace){
+    const nw = pickNewWord(frToReplace);
+
+    leftBtn.textContent = nw.lda;
+    leftBtn.dataset.match = nw.fr;
+    leftBtn.classList.remove('correct','wrong','selected');
+    attachLeftHandler(leftBtn);
+
+    rightBtn.textContent = nw.fr;
+    rightBtn.dataset.match = nw.fr;
+    rightBtn.classList.remove('correct','wrong','selected');
+    attachRightHandler(rightBtn);
+  }
+
+  // Vérifie la paire
+  function checkMatch(){
+    if(!(selectedLDA && selectedFR)) return;
+
+    const isMatch = (selectedLDA.dataset.match === selectedFR.dataset.match);
+    lock = true;
+
+    if(isMatch){
+      selectedLDA.classList.add('correct');
+      selectedFR.classList.add('correct');
+      updateScore(true);
+
+      const frKey = selectedLDA.dataset.match;
+      const leftBtn = selectedLDA;
+      const rightBtn = selectedFR;
+
+      setTimeout(()=>{
+        // On remplace UNIQUEMENT ces deux options par une nouvelle paire
+        replacePair(leftBtn, rightBtn, frKey);
+        selectedLDA = null;
+        selectedFR = null;
+        lock = false;
+      }, 1000);
+    } else {
+      selectedLDA.classList.add('wrong');
+      selectedFR.classList.add('wrong');
+      updateScore(false);
+
+      setTimeout(()=>{
+        selectedLDA.classList.remove('wrong','selected');
+        selectedFR.classList.remove('wrong','selected');
+        selectedLDA = null;
+        selectedFR = null;
+        lock = false;
+      }, 1000);
+    }
+  }
+}
+
+
+
+/* ---------------- Maze engine (variables + helpers) ---------------- */
+const mazeSize = 8;
+let me = {x:0, y:0};
+let goal = {x:mazeSize-1, y:mazeSize-1};
+let walls = [];
+let enemies = [];
+let mazeQuestions = [];
+
+function randomMaze(){
+  walls=[]; enemies=[];
+  me={x:0,y:0}; goal={x:mazeSize-1,y:mazeSize-1};
+  for(let y=0;y<mazeSize;y++){
+    for(let x=0;x<mazeSize;x++){
+      if(Math.random()<0.16 && !(x===0&&y===0) && !(x===goal.x&&y===goal.y)){
+        walls.push({x,y});
+      }
+    }
+  }
+  // ennemis
+  for(let i=0;i<2+Math.floor(Math.random()*3);i++){
+    let ex, ey;
+    do{
+      ex=Math.floor(Math.random()*mazeSize);
+      ey=Math.floor(Math.random()*mazeSize);
+    } while((ex===0&&ey===0)||(ex===goal.x&&ey===goal.y)||walls.some(w=>w.x===ex&&w.y===ey));
+    enemies.push({x:ex,y:ey});
+  }
+}
+
+function generateMazeQuestions(){
+  mazeQuestions=[];
+  ["Up","Down","Left","Right"].forEach(dir=>{
+    const w=pickOne(getWords());
+    let opts=[w.lda];
+    while(opts.length<4){ const r=pickOne(getWords()).lda; if(!opts.includes(r)) opts.push(r); }
+    opts=shuffled(opts);
+    mazeQuestions.push({dir, word:w, opts});
+  });
+}
+
+
+
+function canMove(x,y){
+  return x>=0 && y>=0 && x<mazeSize && y<mazeSize && !walls.some(w=>w.x===x && w.y===y);
+}
+function checkEnemyHit(){
+  return enemies.some(e=>e.x===me.x && e.y===me.y);
+}
+function moveEnemies(){
+  enemies.forEach(e=>{
+    const moves=[{x:0,y:-1},{x:0,y:1},{x:-1,y:0},{x:1,y:0},{x:0,y:0}];
+    const m=pickOne(moves);
+    const nx=e.x+m.x, ny=e.y+m.y;
+    if(canMove(nx,ny) && !(nx===me.x && ny===me.y)){ e.x=nx; e.y=ny; }
+  });
+  if(checkEnemyHit()){ updateScore(false); me={x:0,y:0}; }
+  drawMaze();
+}
+
+
+
+/* ---------------- Draw Maze ---------------- */
+function drawMaze(){
+    const wrap=document.getElementById('view-maze'); wrap.innerHTML='';
+    wrap.insertAdjacentHTML('afterbegin', `<div class="sectionTitle"><span class="tag">Mode</span><span class="head">Labyrinthe 8×8</span></div>`);
+
+    const root = document.createElement('div'); root.className='maze-root';
+    const container=document.createElement('div'); container.className='maze-container';
+
+    const grid=document.createElement('div'); grid.className='maze';
+    for(let y=0;y<mazeSize;y++){
+        for(let x=0;x<mazeSize;x++){
+            const cell=document.createElement('div'); cell.className='cell';
+            if(x===me.x && y===me.y) cell.classList.add('me');
+            if(x===goal.x && y===goal.y) cell.classList.add('goal');
+            if(walls.some(w=>w.x===x && w.y===y)) cell.classList.add('wall');
+            if(enemies.some(e=>e.x===x && e.y===y)) cell.classList.add('enemy');
+            grid.appendChild(cell);
+        }
+    }
+    container.appendChild(grid);
+
+    const panelFor=(dir)=>{
+        const q=mazeQuestions.find(m=>m.dir===dir);
+        if(!q) return; 
+        const box=document.createElement('div'); box.className='ctrl '+dir.toLowerCase();
+        const h=document.createElement('h4'); h.textContent=`${dir} · ${q.word.fr}`; box.appendChild(h);
+        const hr=document.createElement('hr'); box.appendChild(hr.cloneNode());
+        q.opts.forEach(o=>{
+            const b=document.createElement('div'); b.className='choice'; b.textContent=o;
+            b.onclick=()=>{
+                const ok=(o===q.word.lda); updateScore(ok);
+                if(ok){
+                    let nx=me.x, ny=me.y;
+                    if(dir==='Up') ny--;
+                    if(dir==='Down') ny++;
+                    if(dir==='Left') nx--;
+                    if(dir==='Right') nx++;
+                    if(canMove(nx,ny)) me.x=nx, me.y=ny;
+                }
+                if(me.x===goal.x && me.y===goal.y){ alert('Victoire!'); randomMaze(); generateMazeQuestions(); }
+                generateMazeQuestions();
+                drawMaze();
+            };
+            box.appendChild(b);
+        });
+        box.appendChild(hr.cloneNode());
+        return box;
+    };
+
+    container.appendChild(panelFor('Up'));
+    container.appendChild(panelFor('Down'));
+    container.appendChild(panelFor('Left'));
+    container.appendChild(panelFor('Right'));
+
+    root.appendChild(container);
+    wrap.appendChild(root);
+}
+
+/* ---------------- Maze Init ---------------- */
+function initMaze(){
+    randomMaze();
+    generateMazeQuestions();
+    drawMaze();
+    if(mazeTimer) clearInterval(mazeTimer);
+    mazeTimer = setInterval(moveEnemies,1000); // ennemis bougent toutes les secondes
+}
+
+/* ---------------- Sidescroller ---------------- */
+let sideCtx, sidePlayer, sideObstacles, sideEnemies, sideKeys;
+let sideCollectibles, sidePowerups;
+let sideInQuiz = false;
+let sideInvincible = 0;
+let sideCamX = 0;     // caméra
+let sideScore = 0;    // score pièces
+let sideGoal;
+let sideGameOver = false;
+let sideLevelWidth = 1800;   // largeur du niveau (caméra clamp)
+let __sideKeysBound = false; // évite de binder les events plusieurs fois
+
+function initSidescroller(){
+    console.log('initSidescroller()');
+    const canvas = document.getElementById('sideCanvas');
+    if(!canvas){ console.error('Canvas #sideCanvas introuvable'); return; }
+    sideCtx = canvas.getContext('2d');
+
+    // Joueur (global utilisé par sideLoop)
+    sidePlayer = { x: 40, y: 360 - 28, w: 28, h: 28, vy: 0, onGround: false };
+
+    // Niveau déterministe (visible immédiatement)
+    sideObstacles = [
+        {x:140,  y:320, w:120, h:20},
+        {x:320,  y:300, w:120, h:20},
+        {x:500,  y:280, w:100, h:20},
+        {x:650,  y:260, w:100, h:20},
+        {x:820,  y:300, w:140, h:20},
+        {x:1020, y:260, w:100, h:20},
+        {x:1180, y:220, w: 80, h:20},
+        {x:1320, y:300, w:130, h:20},
+        {x:1500, y:260, w:120, h:20}
+    ];
+
+    // Collectibles (pièces)
+    sideCollectibles = [
+        {x:320+60-8,  y:300-24, w:16, h:16, collected:false},
+        {x:500+50-8,  y:280-24, w:16, h:16, collected:false},
+        {x:820+70-8,  y:300-24, w:16, h:16, collected:false},
+        {x:1020+50-8, y:260-24, w:16, h:16, collected:false},
+        {x:1320+65-8, y:300-24, w:16, h:16, collected:false}
+    ];
+
+    // Power-ups (étoile = invincibilité)
+    sidePowerups = [
+        {x:820+30-10, y:300-36, w:20, h:20, type:"star", collected:false}
+    ];
+
+    // Ennemis (patrouilleurs + jumper)
+    sideEnemies = [
+        {x:350, y:300-32, w:32, h:32, vx:1.0, minX:320, maxX:440, type:"walker", quiz:{lda:"MaD", fr:"# Distance / Portée"}},
+        {x:690, y:260-32, w:32, h:32, vx:-1.2, minX:650, maxX:750, type:"walker", quiz:{lda:"PaZ", fr:"Capacité mentale / logique (Intelligence)"}},
+        {x:1050,y:260-32, w:32, h:32, vx:1.2, minX:1020, maxX:1120, type:"walker", quiz:{lda:"RaP", fr:"Talent / Compétence / Disponibilité"}},
+        {x:1200,y:220-32, w:32, h:32, vy:0, onGround:true, jumpCooldown:60, type:"jumper", quiz:{lda:"SaZEo", fr:"Irrationnel / Magie / Imaginaire"}}
+    ];
+
+    // Fin de niveau
+    sideGoal = { x: 1650, y: 280, w: 40, h: 80 };
+
+    // Bind clavier (une seule fois)
+    if(!__sideKeysBound){
+        sideKeys = {};
+        document.addEventListener('keydown', e => { sideKeys[e.key] = true; });
+        document.addEventListener('keyup',   e => { sideKeys[e.key] = false; });
+        __sideKeysBound = true;
+    }
+
+    // reset état
+    sideGameOver = false;
+    sideInvincible = 0;
+    sideInQuiz = false;
+    sideScore = 0;
+    sideCamX = 0;
+
+    // démarre la boucle principale (utilise la fonction sideLoop() déjà dans le fichier)
+    requestAnimationFrame(sideLoop);
+}
+
+
+
+
+
+function sideLoop(){
+    // Vérification rapide pour debugger si jamais ça ne tourne pas
+    if(!sideCtx){ console.error('sideCtx non initialisé'); return; }
+    // console.log('sideLoop() running'); // trop verbeux, uncomment si besoin
+
+    const c = sideCtx, canvas = document.getElementById('sideCanvas');
+    c.clearRect(0,0,canvas.width,canvas.height);
+
+    // Gravité + sol
+    sidePlayer.vy += 1.2;
+    sidePlayer.y  += sidePlayer.vy;
+    if(sidePlayer.y + sidePlayer.h >= 360){
+        sidePlayer.y = 360 - sidePlayer.h;
+        sidePlayer.vy = 0;
+        sidePlayer.onGround = true;
+    } else {
+        sidePlayer.onGround = false;
+    }
+
+    // Déplacements joueur (clamp)
+    if(sideKeys && (sideKeys['ArrowLeft'] || sideKeys['a'])) sidePlayer.x -= 3;
+    if(sideKeys && (sideKeys['ArrowRight']|| sideKeys['d'])) sidePlayer.x += 3;
+    if(sideKeys && (sideKeys['ArrowUp']||sideKeys['w']) && sidePlayer.onGround){
+        sidePlayer.vy = -17; sidePlayer.onGround = false;
+    }
+
+    // Limites du monde + caméra
+    if(sidePlayer.x < 0) sidePlayer.x = 0;
+    if(sidePlayer.x + sidePlayer.w > sideLevelWidth) sidePlayer.x = sideLevelWidth - sidePlayer.w;
+    sideCamX = sidePlayer.x - canvas.width/2;
+    if(sideCamX < 0) sideCamX = 0;
+    const maxCam = Math.max(0, sideLevelWidth - canvas.width);
+    if(sideCamX > maxCam) sideCamX = maxCam;
+
+    // Fond simple / sol
+    c.fillStyle = '#071026';
+    c.fillRect(0,0,canvas.width,canvas.height);
+    c.fillStyle = '#1e293b';
+    c.fillRect(0,360,canvas.width,60);
+
+ // Dessine plateformes
+c.fillStyle = '#475569';
+sideObstacles.forEach(o=>{
+    c.fillRect(o.x - sideCamX, o.y, o.w, o.h);
+
+    // Vérifie uniquement si le joueur est au-dessus de la plateforme
+    const withinX = (sidePlayer.x + sidePlayer.w > o.x && sidePlayer.x < o.x + o.w);
+    const falling = sidePlayer.vy >= 0;
+    if(withinX && falling &&
+       sidePlayer.y + sidePlayer.h >= o.y &&
+       sidePlayer.y + sidePlayer.h <= o.y + 10){
+        sidePlayer.y = o.y - sidePlayer.h;
+        sidePlayer.vy = 0;
+        sidePlayer.onGround = true;
+    }
+});
+
+
+
+    // Pièces (collectibles)
+    c.fillStyle = '#facc15';
+    sideCollectibles.forEach(col=>{
+        if(col.collected) return;
+        c.beginPath();
+        c.arc(col.x - sideCamX + 8, col.y + 8, 8, 0, Math.PI*2);
+        c.fill();
+        if(checkCollision(sidePlayer, col)){
+            col.collected = true;
+            sideScore += 10;
+        }
+    });
+
+    // Power-ups
+    c.fillStyle = '#22c55e';
+    sidePowerups.forEach(p=>{
+        if(p.collected) return;
+        c.fillRect(p.x - sideCamX, p.y, p.w, p.h);
+        if(checkCollision(sidePlayer, p)){
+            p.collected = true;
+            if(p.type === "star") sideInvincible = 300;
+        }
+    });
+
+    // Ennemis
+    c.fillStyle = '#ef4444';
+    sideEnemies.forEach(en=>{
+        if(en.dead) return;
+
+        if(en.type === "walker"){
+            en.x += en.vx;
+            if(en.x < en.minX || en.x > en.maxX) en.vx *= -1;
+        } else if(en.type === "jumper"){
+            if(en.onGround){
+                if(en.jumpCooldown <= 0){
+                    en.vy = -10; en.onGround = false; en.jumpCooldown = 90;
+                } else en.jumpCooldown--;
+            }
+            en.vy += 1;
+            en.y  += en.vy;
+            if(en.y + en.h >= 360){ en.y = 360 - en.h; en.vy = 0; en.onGround = true; }
+        }
+
+        c.fillRect(en.x - sideCamX, en.y, en.w, en.h);
+
+     // Collision joueur-ennemi
+if(checkCollision(sidePlayer, en)){
+    if(!sideInQuiz){
+        sideInQuiz = true;
+        showSideQuiz(en);
+    }
+}
+
+
+    });
+
+    // Fin de niveau
+    c.fillStyle = '#38bdf8';
+    c.fillRect(sideGoal.x - sideCamX, sideGoal.y, sideGoal.w, sideGoal.h);
+    if(checkCollision(sidePlayer, sideGoal)) sideGameOver = true;
+
+    // Joueur (change couleur si invincible)
+    c.fillStyle = sideInvincible > 0 ? '#fde047' : '#7dd3fc';
+    c.fillRect(sidePlayer.x - sideCamX, sidePlayer.y, sidePlayer.w, sidePlayer.h);
+
+    // HUD
+    c.fillStyle = '#fff';
+    c.font = "16px sans-serif";
+    c.fillText("Score: " + sideScore, 10, 20);
+
+    if(sideInvincible > 0) sideInvincible--;
+
+    if(sideGameOver){
+        c.fillStyle = '#fff';
+        c.font = "24px sans-serif";
+        c.fillText("Niveau terminé !", canvas.width/2 - 80, canvas.height/2);
+        return;
+    }
+
+    requestAnimationFrame(sideLoop);
+}
+
+function checkCollision(a,b){
+    return (a.x < (b.x + (b.w||0)) &&
+            (a.x + a.w) > b.x &&
+            a.y < (b.y + (b.h||0)) &&
+            (a.y + a.h) > b.y);
+}
+
+/* Quiz quand collision */
+/* Quiz quand collision */
+
+/* ---------------- Jeu Mémoire ---------------- */
+let memoryFirst = null;
+let memoryLock = false;
+
+function initMemory(){
+  const board = document.getElementById('memory-board');
+  board.innerHTML='';
+  memoryFirst=null; 
+  memoryLock=false;
+
+  // On prend 6 paires au hasard
+  const basePairs = shuffled(getWords()).slice(0,6);
+
+  // On fabrique les cartes : chaque paire donne 2 cartes (lda et fr)
+  let cards = [];
+  basePairs.forEach(w=>{
+    cards.push({id:w.fr+'-lda', key:w.fr, text:w.lda});
+    cards.push({id:w.fr+'-fr', key:w.fr, text:w.fr});
+  });
+  cards = shuffled(cards);
+
+  cards.forEach(c=>{
+    const card = document.createElement('div');
+    card.className='choice';
+    card.style.height='80px';
+    card.style.display='flex';
+    card.style.alignItems='center';
+    card.style.justifyContent='center';
+    card.style.cursor='pointer';
+    card.style.background='#444';
+    card.style.color='#444'; // texte caché
+    card.dataset.key=c.key;
+    card.dataset.text=c.text;
+    card.textContent=c.text;
+
+    card.onclick=()=>{
+      if(memoryLock || card.classList.contains('matched') || card===memoryFirst) return;
+      reveal(card);
+
+      if(!memoryFirst){
+        memoryFirst=card;
+      } else {
+        // deuxième clic
+        if(card.dataset.key===memoryFirst.dataset.key){
+          // Paire trouvée
+          memoryLock=true;
+          setTimeout(()=>{
+            card.classList.add('matched');
+            memoryFirst.classList.add('matched');
+            card.style.visibility='hidden';
+            memoryFirst.style.visibility='hidden';
+            memoryFirst=null;
+            memoryLock=false;
+            updateScore(true);
+
+            // Vérifie si toutes les cartes sont retirées
+            if([...board.querySelectorAll('.choice')].every(el=>el.classList.contains('matched'))){
+              setTimeout(()=>alert("Bravo ! Toutes les paires trouvées !"), 300);
+            }
+
+          },500);
+        } else {
+          // Mauvaise paire
+          memoryLock=true;
+          setTimeout(()=>{
+            hide(card);
+            hide(memoryFirst);
+            memoryFirst=null;
+            memoryLock=false;
+            updateScore(false);
+          },1000);
+        }
+      }
+    };
+
+    board.appendChild(card);
+  });
+}
+
+function reveal(card){
+  card.style.background='#222';
+  card.style.color='#fff';
+}
+function hide(card){
+  card.style.background='#444';
+  card.style.color='#444';
+}
+
+
+
+
+
+function showSideQuiz(enemy){
+    if(sideInQuiz) return;
+    sideInQuiz = true;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'quiz'; overlay.style.display = 'flex';
+    document.body.appendChild(overlay);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    overlay.appendChild(card);
+
+    const w = pickOne(getWords());
+    card.innerHTML = `<div class="q-title">Question</div>
+        <div class="q-word">${w.fr}</div>`;
+
+    // Timer
+    let timeLeft = 10;
+    const timerEl = document.createElement('div');
+    timerEl.style.textAlign = 'center';
+    timerEl.style.marginBottom = '10px';
+    timerEl.textContent = `⏱️ ${timeLeft}s`;
+    card.insertBefore(timerEl, card.firstChild);
+
+    const countdown = setInterval(()=>{
+        timeLeft--;
+        timerEl.textContent = `⏱️ ${timeLeft}s`;
+        if(timeLeft<=0){
+            clearInterval(countdown);
+            document.body.removeChild(overlay);
+            sideInQuiz = false;
+            alert("Temps écoulé ! Game Over");
+            initSidescroller(); // reset le jeu
+        }
+    },1000);
+
+    // Choix
+    const opts = shuffled([w.lda, ...shuffled(words).slice(0,3).map(x=>x.lda)]);
+    opts.forEach(o=>{
+        const b = createChoice(o, o===w.lda, (ok)=>{
+            clearInterval(countdown);
+            updateScore(ok);
+            document.body.removeChild(overlay);
+            sideInQuiz = false;
+            if(ok){
+                enemy.dead = true; // supprime l’ennemi
+            } else {
+                alert("Mauvaise réponse ! Game Over");
+                initSidescroller();
+            }
+        });
+        card.appendChild(b);
+    });
+}
+
+
+
+
+
+/* ---------------- Switch View ---------------- */
+function switchView(id){
+  // liste complète des vues (ajoute toute nouvelle vue ici)
+  const views = ['assoc','cats','maze','side','progress','memory'];
+
+  // masquer/afficher proprement
+  views.forEach(v=>{
+    const el = document.getElementById('view-'+v);
+    if(el) el.hidden = (v !== id);
+  });
+
+  // Nettoyage spécifique
+  if(mazeTimer) clearInterval(mazeTimer); // stop le timer du labyrinthe si actif
+
+  // Appels d'initialisation pour chaque vue
+  if(id === 'assoc'){ assocGame(); return; }
+  if(id === 'cats'){ catGame(); return; }
+  if(id === 'maze'){ initMaze(); return; }
+  if(id === 'side'){ initSidescroller(); return; }
+  if(id === 'progress'){ drawConstellation(); return; }
+  if(id === 'memory'){ initMemory(); return; }
+
+  // fallback (si id inattendu)
+  console.warn('switchView: vue inconnue ->', id);
+}
+
+
+
+
+
+/* ---------------- Init ---------------- */
+switchView('assoc');
+drawConstellation();
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
